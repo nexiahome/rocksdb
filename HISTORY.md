@@ -1,4 +1,8 @@
 # Rocksdb Change Log
+## 5.18.31 (5/6/2019)
+### Nexia Fork
+* Add a digit to the patchlevel as a means of distinguishing between Nexia-local forked versions and upstream.
+
 ## 5.18.3 (2/11/2019)
 ### Bug Fixes
 * Fix possible LSM corruption when both range deletions and subcompactions are used. The symptom of this corruption is L1+ files overlapping in the user key space.
