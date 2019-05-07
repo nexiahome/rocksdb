@@ -37,13 +37,19 @@ public class OptimisticTransactionDB extends RocksDB
    */
   public static OptimisticTransactionDB open(final Options options,
       final String path) throws RocksDBException {
+    Options realOptions = options;
+    if (options.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new Options(options);
+      realOptions.setStatistics(stats);
+    }
     final OptimisticTransactionDB otdb = new OptimisticTransactionDB(open(
-        options.nativeHandle_, path));
+        realOptions.nativeHandle_, path));
 
     // when non-default Options is used, keeping an Options reference
     // in RocksDB can prevent Java to GC during the life-time of
     // the currently-created RocksDB.
-    otdb.storeOptionsInstance(options);
+    otdb.storeOptionsInstance(realOptions, path);
 
     return otdb;
   }
@@ -77,7 +83,13 @@ public class OptimisticTransactionDB extends RocksDB
       cfOptionHandles[i] = cfDescriptor.columnFamilyOptions().nativeHandle_;
     }
 
-    final long[] handles = open(dbOptions.nativeHandle_, path, cfNames,
+    DBOptions realOptions = dbOptions;
+    if (dbOptions.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new DBOptions(dbOptions);
+      realOptions.setStatistics(stats);
+    }
+    final long[] handles = open(realOptions.nativeHandle_, path, cfNames,
         cfOptionHandles);
     final OptimisticTransactionDB otdb =
         new OptimisticTransactionDB(handles[0]);
@@ -85,7 +97,7 @@ public class OptimisticTransactionDB extends RocksDB
     // when non-default Options is used, keeping an Options reference
     // in RocksDB can prevent Java to GC during the life-time of
     // the currently-created RocksDB.
-    otdb.storeOptionsInstance(dbOptions);
+    otdb.storeOptionsInstance(realOptions, path);
 
     for (int i = 1; i < handles.length; i++) {
       columnFamilyHandles.add(new ColumnFamilyHandle(otdb, handles[i]));

@@ -43,13 +43,19 @@ public class TransactionDB extends RocksDB
   public static TransactionDB open(final Options options,
       final TransactionDBOptions transactionDbOptions, final String path)
       throws RocksDBException {
-    final TransactionDB tdb = new TransactionDB(open(options.nativeHandle_,
+    Options realOptions = options;
+    if (options.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new Options(options);
+      realOptions.setStatistics(stats);
+    }
+    final TransactionDB tdb = new TransactionDB(open(realOptions.nativeHandle_,
         transactionDbOptions.nativeHandle_, path));
 
     // when non-default Options is used, keeping an Options reference
     // in RocksDB can prevent Java to GC during the life-time of
     // the currently-created RocksDB.
-    tdb.storeOptionsInstance(options);
+    tdb.storeOptionsInstance(realOptions, path);
     tdb.storeTransactionDbOptions(transactionDbOptions);
 
     return tdb;
@@ -87,14 +93,20 @@ public class TransactionDB extends RocksDB
       cfOptionHandles[i] = cfDescriptor.columnFamilyOptions().nativeHandle_;
     }
 
-    final long[] handles = open(dbOptions.nativeHandle_,
+    DBOptions realOptions = dbOptions;
+    if (dbOptions.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new DBOptions(dbOptions);
+      realOptions.setStatistics(stats);
+    }
+    final long[] handles = open(realOptions.nativeHandle_,
         transactionDbOptions.nativeHandle_, path, cfNames, cfOptionHandles);
     final TransactionDB tdb = new TransactionDB(handles[0]);
 
     // when non-default Options is used, keeping an Options reference
     // in RocksDB can prevent Java to GC during the life-time of
     // the currently-created RocksDB.
-    tdb.storeOptionsInstance(dbOptions);
+    tdb.storeOptionsInstance(realOptions, path);
     tdb.storeTransactionDbOptions(transactionDbOptions);
 
     for (int i = 1; i < handles.length; i++) {

@@ -171,6 +171,10 @@ SAMPLES_MAIN_SRC = samples/src/main/java
 SAMPLES_OUTPUT = samples/target
 SAMPLES_MAIN_CLASSES = $(SAMPLES_OUTPUT)/classes
 
+JAVA_LIBDIR = libs
+JAVA_DROPWIZARD_JAR = $(JAVA_LIBDIR)/metrics-core-4.1.0.jar
+JAVA_LIBCLASSPATH = $(JAVA_DROPWIZARD_JAR)
+
 JAVA_TEST_LIBDIR = test-libs
 JAVA_JUNIT_JAR = $(JAVA_TEST_LIBDIR)/junit-4.12.jar
 JAVA_HAMCR_JAR = $(JAVA_TEST_LIBDIR)/hamcrest-core-1.3.jar
@@ -209,9 +213,9 @@ javadocs: java
 
 javalib: java java_test javadocs
 
-java:
+java: resolve_lib_deps
 	$(AM_V_GEN)mkdir -p $(MAIN_CLASSES)
-	$(AM_V_at)javac $(JAVAC_ARGS) -d $(MAIN_CLASSES)\
+	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(JAVA_LIBCLASSPATH) -d $(MAIN_CLASSES)\
 		$(MAIN_SRC)/org/rocksdb/util/*.java\
 		$(MAIN_SRC)/org/rocksdb/*.java
 	$(AM_V_at)@cp ../HISTORY.md ./HISTORY-CPP.md
@@ -220,33 +224,37 @@ java:
 
 sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBSample.java
+	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_LIBCLASSPATH) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBSample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni_not_found
-	java $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBSample /tmp/rocksdbjni
+	java $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES):$(JAVA_LIBCLASSPATH) RocksDBSample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni_not_found
 
 column_family_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBColumnFamilySample.java
+	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_LIBCLASSPATH) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBColumnFamilySample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	java $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBColumnFamilySample /tmp/rocksdbjni
+	java $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES):$(JAVA_LIBCLASSPATH) RocksDBColumnFamilySample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 
 transaction_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)javac -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/TransactionSample.java
+	$(AM_V_at)javac -cp $(MAIN_CLASSES):$(JAVA_LIBCLASSPATH) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/TransactionSample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	java -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) TransactionSample /tmp/rocksdbjni
+	java -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES):$(JAVA_LIBCLASSPATH) TransactionSample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 
 optimistic_transaction_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)javac -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/OptimisticTransactionSample.java
+	$(AM_V_at)javac -cp $(MAIN_CLASSES):$(JAVA_LIBCLASSPATH) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/OptimisticTransactionSample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	java -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) OptimisticTransactionSample /tmp/rocksdbjni
+	java -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES):$(JAVA_LIBCLASSPATH) OptimisticTransactionSample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
+
+resolve_lib_deps:
+	test -d "$(JAVA_LIBDIR)" || mkdir -p "$(JAVA_LIBDIR)"
+	test -s "$(JAVA_DROPWIZARD_JAR)" || cp $(MVN_LOCAL)/io/dropwizard/metrics/metrics-core/4.1.0/metrics-core-4.1.0.jar $(JAVA_TEST_LIBDIR) || curl -k -L -o $(JAVA_DROPWIZARD_JAR) $(SEARCH_REPO_URL)io/dropwizard/metrics/metrics-core/4.1.0/metrics-core-4.1.0.jar
 
 resolve_test_deps:
 	test -d "$(JAVA_TEST_LIBDIR)" || mkdir -p "$(JAVA_TEST_LIBDIR)"
@@ -258,7 +266,7 @@ resolve_test_deps:
 
 java_test: java resolve_test_deps
 	$(AM_V_GEN)mkdir -p $(TEST_CLASSES)
-	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_TESTCLASSPATH) -d $(TEST_CLASSES)\
+	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_LIBCLASSPATH):$(JAVA_TESTCLASSPATH) -d $(TEST_CLASSES)\
 		$(TEST_SRC)/org/rocksdb/test/*.java\
 		$(TEST_SRC)/org/rocksdb/util/*.java\
 		$(TEST_SRC)/org/rocksdb/*.java
@@ -267,8 +275,8 @@ java_test: java resolve_test_deps
 test: java java_test run_test
 
 run_test:
-	java $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(TEST_CLASSES):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(JAVA_TESTS)
+	java $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(TEST_CLASSES):$(JAVA_LIBCLASSPATH):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(JAVA_TESTS)
 
 db_bench: java
 	$(AM_V_GEN)mkdir -p $(BENCHMARK_MAIN_CLASSES)
-	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(BENCHMARK_MAIN_CLASSES) $(BENCHMARK_MAIN_SRC)/org/rocksdb/benchmark/*.java
+	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_LIBCLASSPATH) -d $(BENCHMARK_MAIN_CLASSES) $(BENCHMARK_MAIN_SRC)/org/rocksdb/benchmark/*.java

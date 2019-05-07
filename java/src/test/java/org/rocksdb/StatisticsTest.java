@@ -5,16 +5,30 @@
 
 package org.rocksdb;
 
+import com.codahale.metrics.*;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.nio.charset.StandardCharsets;
+import java.util.SortedMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class StatisticsTest {
+  private class EndsWithFilter implements MetricFilter {
+    private String suffix;
+
+    public EndsWithFilter(String suffix) {
+      this.suffix = suffix;
+    }
+
+    @Override
+    public boolean matches(String name, Metric metric) {
+      return name.endsWith(suffix);
+    }
+  }
 
   @ClassRule
   public static final RocksMemoryResource rocksMemoryResource =
@@ -47,7 +61,12 @@ public class StatisticsTest {
         db.get(key);
       }
 
-      assertThat(statistics.getTickerCount(TickerType.BYTES_READ)).isGreaterThan(0);
+      Long bytesRead = statistics.getTickerCount(TickerType.BYTES_READ);
+      assertThat(bytesRead).isGreaterThan(0);
+      SortedMap<String, Gauge> gaugeMap =
+          SharedMetricRegistries.getOrCreate("default").getGauges(
+              new EndsWithFilter(".{path=" + dbFolder.getRoot().getAbsolutePath() + "}.BYTES_READ"));
+      assertThat(((Gauge<Long>)gaugeMap.get(gaugeMap.firstKey())).getValue()).isEqualTo(bytesRead);
     }
   }
 

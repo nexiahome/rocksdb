@@ -10,6 +10,9 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SharedMetricRegistries;
 import org.rocksdb.util.Environment;
 
 /**
@@ -21,6 +24,39 @@ import org.rocksdb.util.Environment;
 public class RocksDB extends RocksObject {
   public static final byte[] DEFAULT_COLUMN_FAMILY = "default".getBytes();
   public static final int NOT_FOUND = -1;
+
+  private static final MetricRegistry DEFAULT_METRIC_REGISTRY =
+      SharedMetricRegistries.getOrCreate("default");
+
+  private class TickerMetric implements MetricRegistry.MetricSupplier<Gauge> {
+    private class TickerGauge implements Gauge<Long> {
+      private final Statistics statistics;
+      private final TickerType tickerType;
+
+      public TickerGauge(Statistics statistics, TickerType tickerType) {
+        this.statistics = statistics;
+        this.tickerType = tickerType;
+      }
+
+      @Override
+      public Long getValue() {
+        return statistics.getTickerCount(tickerType);
+      }
+    }
+
+    private final Statistics statistics;
+    private final TickerType tickerType;
+
+    public TickerMetric(Statistics statistics, TickerType tickerType) {
+      this.statistics = statistics;
+      this.tickerType = tickerType;
+    }
+
+    @Override
+    public Gauge newMetric() {
+      return new TickerGauge(statistics, tickerType);
+    }
+  }
 
   private enum LibraryState {
     NOT_LOADED,
@@ -225,11 +261,17 @@ public class RocksDB extends RocksObject {
    */
   public static RocksDB open(final Options options, final String path)
       throws RocksDBException {
+    Options realOptions = options;
+    if (options.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new Options(options);
+      realOptions.setStatistics(stats);
+    }
     // when non-default Options is used, keeping an Options reference
     // in RocksDB can prevent Java to GC during the life-time of
     // the currently-created RocksDB.
-    final RocksDB db = new RocksDB(open(options.nativeHandle_, path));
-    db.storeOptionsInstance(options);
+    final RocksDB db = new RocksDB(open(realOptions.nativeHandle_, path));
+    db.storeOptionsInstance(realOptions, path);
     return db;
   }
 
@@ -283,10 +325,16 @@ public class RocksDB extends RocksObject {
       cfOptionHandles[i] = cfDescriptor.columnFamilyOptions().nativeHandle_;
     }
 
-    final long[] handles = open(options.nativeHandle_, path, cfNames,
+    DBOptions realOptions = options;
+    if (options.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new DBOptions(options);
+      realOptions.setStatistics(stats);
+    }
+    final long[] handles = open(realOptions.nativeHandle_, path, cfNames,
         cfOptionHandles);
     final RocksDB db = new RocksDB(handles[0]);
-    db.storeOptionsInstance(options);
+    db.storeOptionsInstance(realOptions, path);
 
     for (int i = 1; i < handles.length; i++) {
       columnFamilyHandles.add(new ColumnFamilyHandle(db, handles[i]));
@@ -360,11 +408,17 @@ public class RocksDB extends RocksObject {
    */
   public static RocksDB openReadOnly(final Options options, final String path)
       throws RocksDBException {
+    Options realOptions = options;
+    if (options.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new Options(options);
+      realOptions.setStatistics(stats);
+    }
     // when non-default Options is used, keeping an Options reference
     // in RocksDB can prevent Java to GC during the life-time of
     // the currently-created RocksDB.
-    final RocksDB db = new RocksDB(openROnly(options.nativeHandle_, path));
-    db.storeOptionsInstance(options);
+    final RocksDB db = new RocksDB(openROnly(realOptions.nativeHandle_, path));
+    db.storeOptionsInstance(realOptions, path);
     return db;
   }
 
@@ -407,10 +461,16 @@ public class RocksDB extends RocksObject {
       cfOptionHandles[i] = cfDescriptor.columnFamilyOptions().nativeHandle_;
     }
 
-    final long[] handles = openROnly(options.nativeHandle_, path, cfNames,
+    DBOptions realOptions = options;
+    if (options.statistics() == null) {
+      Statistics stats = new Statistics();
+      realOptions = new DBOptions(options);
+      realOptions.setStatistics(stats);
+    }
+    final long[] handles = openROnly(realOptions.nativeHandle_, path, cfNames,
         cfOptionHandles);
     final RocksDB db = new RocksDB(handles[0]);
-    db.storeOptionsInstance(options);
+    db.storeOptionsInstance(realOptions, path);
 
     for (int i = 1; i < handles.length; i++) {
       columnFamilyHandles.add(new ColumnFamilyHandle(db, handles[i]));
@@ -435,8 +495,16 @@ public class RocksDB extends RocksObject {
         path));
   }
 
-  protected void storeOptionsInstance(DBOptionsInterface options) {
+  protected void storeOptionsInstance(DBOptionsInterface options, String path) {
     options_ = options;
+    Statistics stats = options.statistics();
+    if (stats == null) {
+      return;
+    }
+    String basename = this.getClass().getCanonicalName() + ".{path=" + path + "}.";
+    for (TickerType ttype : TickerType.values()) {
+      DEFAULT_METRIC_REGISTRY.gauge(basename + ttype.toString(), new TickerMetric(stats, ttype));
+    }
   }
 
   private static void checkBounds(int offset, int len, int size) {

@@ -1,4 +1,8 @@
 # Rocksdb Change Log
+## 5.18.32 (5/7/2019)
+### Nexia Fork
+* Automatically export ticker statistics for all databases opened via Dropwizard Metrics.
+
 ## 5.18.31 (5/6/2019)
 ### Nexia Fork
 * Add a digit to the patchlevel as a means of distinguishing between Nexia-local forked versions and upstream.
