@@ -1820,18 +1820,18 @@ rocksdbjavastaticrelease: rocksdbjavastatic
 	cd java/target;jar -uf $(ROCKSDB_JAR_ALL) librocksdbjni-*.so librocksdbjni-*.jnilib
 	cd java/target/classes;jar -uf ../$(ROCKSDB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
 
-rocksdbjavastaticreleasedocker: rocksdbjavastatic rocksdbjavastaticdockeralpinex64
+rocksdbjavastaticreleasedocker: rocksdbjavastatic rocksdbjavastaticdockerstretchx64
 	cd java;jar -cf target/$(ROCKSDB_JAR_ALL) HISTORY*.md
 	cd java/target;jar -uf $(ROCKSDB_JAR_ALL) librocksdbjni-*.so librocksdbjni-*.jnilib
 	cd java/target/classes;jar -uf ../$(ROCKSDB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
 
-rocksdbjavastaticdockeralpinex64:
+rocksdbjavastaticdockerstretchx64:
 	mkdir -p java/target
-	DOCKER_LINUX_ALPINE_X64_CONTAINER=`docker ps -aqf name=rocksdb_linux_alpine_x64`; \
-	if [ -z "$$DOCKER_LINUX_ALPINE_X64_CONTAINER" ]; then \
-		docker container create --attach stdin --attach stdout --attach stderr --volume `pwd`:/rocksdb-host --name rocksdb_linux_alpine_x64 657781187896.dkr.ecr.us-east-1.amazonaws.com/rocksjava:alpine-linux_x64 /rocksdb-host/java/crossbuild/docker-build-linux-alpine.sh; \
+	DOCKER_LINUX_STRETCH_GLIBC_X64_CONTAINER=`docker ps -aqf name=rocksdb_linux_stretch_x64`; \
+	if [ -z "$$DOCKER_LINUX_STRETCH_GLIBC_X64_CONTAINER" ]; then \
+		docker container create --attach stdin --attach stdout --attach stderr --volume `pwd`:/rocksdb-host --name rocksdb_linux_stretch_x64 657781187896.dkr.ecr.us-east-1.amazonaws.com/rocksjava:stretch-linux_x64 /rocksdb-host/java/crossbuild/docker-build-linux-stretch.sh; \
 	fi
-	docker start -a rocksdb_linux_alpine_x64
+	docker start -a rocksdb_linux_stretch_x64
 
 rocksdbjavastaticdockerx86:
 	mkdir -p java/target
