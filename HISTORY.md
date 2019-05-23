@@ -1,4 +1,8 @@
 # Rocksdb Change Log
+## 5.18.33 (5/23/2019)
+### Nexia Fork
+* Release multiplatform build.
+
 ## 5.18.32 (5/7/2019)
 ### Nexia Fork
 * Automatically export ticker statistics for all databases opened via Dropwizard Metrics.

@@ -1820,10 +1820,18 @@ rocksdbjavastaticrelease: rocksdbjavastatic
 	cd java/target;jar -uf $(ROCKSDB_JAR_ALL) librocksdbjni-*.so librocksdbjni-*.jnilib
 	cd java/target/classes;jar -uf ../$(ROCKSDB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
 
-rocksdbjavastaticreleasedocker: rocksdbjavastatic rocksdbjavastaticdockerx86 rocksdbjavastaticdockerx86_64
+rocksdbjavastaticreleasedocker: rocksdbjavastatic rocksdbjavastaticdockeralpinex64
 	cd java;jar -cf target/$(ROCKSDB_JAR_ALL) HISTORY*.md
 	cd java/target;jar -uf $(ROCKSDB_JAR_ALL) librocksdbjni-*.so librocksdbjni-*.jnilib
 	cd java/target/classes;jar -uf ../$(ROCKSDB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
+
+rocksdbjavastaticdockeralpinex64:
+	mkdir -p java/target
+	DOCKER_LINUX_ALPINE_X64_CONTAINER=`docker ps -aqf name=rocksdb_linux_alpine_x64`; \
+	if [ -z "$$DOCKER_LINUX_ALPINE_X64_CONTAINER" ]; then \
+		docker container create --attach stdin --attach stdout --attach stderr --volume `pwd`:/rocksdb-host --name rocksdb_linux_alpine_x64 657781187896.dkr.ecr.us-east-1.amazonaws.com/rocksjava:alpine-linux_x64 /rocksdb-host/java/crossbuild/docker-build-linux-alpine.sh; \
+	fi
+	docker start -a rocksdb_linux_alpine_x64
 
 rocksdbjavastaticdockerx86:
 	mkdir -p java/target
@@ -1852,6 +1860,15 @@ rocksdbjavastaticdockerppc64le:
 rocksdbjavastaticpublish: rocksdbjavastaticrelease rocksdbjavastaticpublishcentral
 
 rocksdbjavastaticpublishdocker: rocksdbjavastaticreleasedocker rocksdbjavastaticpublishcentral
+
+rocksdbjavastaticpublishnexia: rocksdbjavastaticreleasedocker rocksdbjavastaticpublishnexiacentral
+
+rocksdbjavastaticpublishnexiacentral:
+	mvn gpg:sign-and-deploy-file -Durl=https://artifactory.nexiabuild.com/artifactory/libs-release/ -DrepositoryId=central -DpomFile=java/rocksjni.pom -Dfile=java/target/rocksdbjni-$(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH)-javadoc.jar -Dclassifier=javadoc
+	mvn gpg:sign-and-deploy-file -Durl=https://artifactory.nexiabuild.com/artifactory/libs-release/ -DrepositoryId=central -DpomFile=java/rocksjni.pom -Dfile=java/target/rocksdbjni-$(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH)-sources.jar -Dclassifier=sources
+	mvn gpg:sign-and-deploy-file -Durl=https://artifactory.nexiabuild.com/artifactory/libs-release/ -DrepositoryId=central -DpomFile=java/rocksjni.pom -Dfile=java/target/rocksdbjni-$(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH)-linux64.jar -Dclassifier=linux64
+	mvn gpg:sign-and-deploy-file -Durl=https://artifactory.nexiabuild.com/artifactory/libs-release/ -DrepositoryId=central -DpomFile=java/rocksjni.pom -Dfile=java/target/rocksdbjni-$(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH)-osx.jar -Dclassifier=osx
+	mvn gpg:sign-and-deploy-file -Durl=https://artifactory.nexiabuild.com/artifactory/libs-release/ -DrepositoryId=central -DpomFile=java/rocksjni.pom -Dfile=java/target/rocksdbjni-$(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH).jar
 
 rocksdbjavastaticpublishcentral:
 	mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=java/rocksjni.pom -Dfile=java/target/rocksdbjni-$(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH)-javadoc.jar -Dclassifier=javadoc
